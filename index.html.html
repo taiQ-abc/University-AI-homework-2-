@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>支付宝账单支出统计看板</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Microsoft YaHei", Arial, sans-serif;
+    background: #f5f7fb;
+    color: #1f2d3d;
+  }
+  .header {
+    padding: 24px 32px 8px;
+  }
+  .header h1 {
+    margin: 0 0 6px;
+    font-size: 26px;
+  }
+  .header p {
+    margin: 0;
+    color: #6b7a90;
+    font-size: 14px;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    padding: 16px 32px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: 0 4px 16px rgba(31, 45, 61, 0.06);
+  }
+  .card .label {
+    font-size: 13px;
+    color: #7a8aa0;
+    margin-bottom: 8px;
+  }
+  .card .value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1677ff;
+  }
+  .card .value.small {
+    font-size: 20px;
+  }
+  .charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 8px 32px 16px;
+  }
+  .chart-box {
+    background: #fff;
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 4px 16px rgba(31, 45, 61, 0.06);
+    min-height: 420px;
+  }
+  .chart {
+    width: 100%;
+    height: 390px;
+  }
+  .table-wrap {
+    margin: 8px 32px 32px;
+    background: #fff;
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 4px 16px rgba(31, 45, 61, 0.06);
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #edf1f7;
+    text-align: left;
+    white-space: nowrap;
+  }
+  th {
+    color: #5b6b82;
+    font-weight: 600;
+    background: #fafbfe;
+  }
+  tr:hover td {
+    background: #f7faff;
+  }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    background: #eaf3ff;
+    color: #1677ff;
+  }
+  @media (max-width: 900px) {
+    .charts { grid-template-columns: 1fr; }
+    .header, .cards, .charts, .table-wrap { padding-left: 16px; padding-right: 16px; }
+    .table-wrap { margin-left: 16px; margin-right: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>支付宝账单支出统计看板</h1>
+  <p>统计区间：2026-07-09 至 2026-10-09 ｜ 口径：逐笔明细加总，“不计收支”统一记为支出；769.00 元已归入数码电器</p>
+</div>
+
+<div class="cards">
+  <div class="card">
+    <div class="label">总支出</div>
+    <div class="value">¥1069.85</div>
+  </div>
+  <div class="card">
+    <div class="label">总笔数</div>
+    <div class="value">15 笔</div>
+  </div>
+  <div class="card">
+    <div class="label">平均每笔</div>
+    <div class="value">¥71.32</div>
+  </div>
+  <div class="card">
+    <div class="label">最大单笔</div>
+    <div class="value small">¥769.00</div>
+    <div class="label" style="margin-top:6px;">索尼 DSC-H400 · 数码电器</div>
+  </div>
+</div>
+
+<div class="charts">
+  <div class="chart-box">
+    <div id="pieChart" class="chart"></div>
+  </div>
+  <div class="chart-box">
+    <div id="barChart" class="chart"></div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>交易时间</th>
+        <th>类别</th>
+        <th>交易对方/商品</th>
+        <th>金额（元）</th>
+        <th>原收/支</th>
+        <th>交易状态</th>
+      </tr>
+    </thead>
+    <tbody id="detailTable"></tbody>
+  </table>
+</div>
+
+<script>
+  // 类别数据：769 已从日用百货调整到数码电器
+  const categoryData = [
+    { name: '数码电器', value: 840.20 },
+    { name: '日用百货', value: 104.33 },
+    { name: '充值缴费', value: 50.00 },
+    { name: '退款', value: 44.80 },
+    { name: '其他', value: 25.80 },
+    { name: '餐饮美食', value: 4.72 }
+  ];
+
+  // 每日支出数据
+  const dailyData = [
+    { date: '2026-09-03', value: 93.80 },
+    { date: '2026-09-08', value: 31.00 },
+    { date: '2026-09-16', value: 19.00 },
+    { date: '2026-09-21', value: 44.80 },
+    { date: '2026-09-22', value: 24.88 },
+    { date: '2026-09-23', value: 4.72 },
+    { date: '2026-09-29', value: 769.00 },
+    { date: '2026-10-04', value: 12.00 },
+    { date: '2026-10-09', value: 70.65 }
+  ];
+
+  // 明细数据
+  const detailData = [
+    { time: '2026-10-09 00:23:21', cat: '日用百货', desc: '心相印抽纸120抽大包', amount: 11.45, orig: '支出', status: '等待确认收货' },
+    { time: '2026-10-09 00:22:08', cat: '数码电器', desc: '原装索尼正品存储卡', amount: 34.20, orig: '支出', status: '支付成功' },
+    { time: '2026-10-09 00:21:18', cat: '数码电器', desc: '索尼 NP-BX1 电池+充电器', amount: 25.00, orig: '支出', status: '等待确认收货' },
+    { time: '2026-10-04 23:52:50', cat: '数码电器', desc: '索尼相机肩带', amount: 12.00, orig: '支出', status: '等待确认收货' },
+    { time: '2026-09-29 22:56:38', cat: '数码电器', desc: '索尼 DSC-H400（已调整类别）', amount: 769.00, orig: '支出', status: '交易成功' },
+    { time: '2026-09-23 15:34:25', cat: '餐饮美食', desc: '安徽汇旺餐饮', amount: 4.72, orig: '支出', status: '交易成功' },
+    { time: '2026-09-22 22:33:22', cat: '日用百货', desc: '玻纤匹克球拍', amount: 24.88, orig: '支出', status: '交易成功' },
+    { time: '2026-09-21 21:04:02', cat: '退款', desc: '退款-匹克球拍', amount: 19.00, orig: '不计收支', status: '退款成功' },
+    { time: '2026-09-21 19:56:01', cat: '退款', desc: '退款-工程制图 第4版', amount: 25.80, orig: '不计收支', status: '退款成功' },
+    { time: '2026-09-16 15:20:57', cat: '日用百货', desc: '碳纤维匹克球拍套装', amount: 19.00, orig: '支出', status: '交易关闭' },
+    { time: '2026-09-08 12:40:33', cat: '日用百货', desc: '真彩ZCD-4956A绘图仪器', amount: 15.50, orig: '支出', status: '交易成功' },
+    { time: '2026-09-08 12:40:01', cat: '日用百货', desc: '真彩ZCD-4956A绘图仪器', amount: 15.50, orig: '不计收支', status: '交易关闭' },
+    { time: '2026-09-03 18:19:14', cat: '日用百货', desc: '材料科学基础 第三版', amount: 18.00, orig: '支出', status: '交易成功' },
+    { time: '2026-09-03 18:16:10', cat: '其他', desc: '工程制图 第4版', amount: 25.80, orig: '支出', status: '交易关闭' },
+    { time: '2026-09-03 15:20:00', cat: '充值缴费', desc: '宁波交通一卡通 充值', amount: 50.00, orig: '支出', status: '交易成功' }
+  ];
+
+  // 饼图
+  const pieChart = echarts.init(document.getElementById('pieChart'));
+  pieChart.setOption({
+    title: { text: '类别支出占比', left: 'center', top: 8, textStyle: { fontSize: 16 } },
+    tooltip: { trigger: 'item', formatter: '{b}<br/>¥{c}（{d}%）' },
+    legend: { bottom: 0, type: 'scroll' },
+    series: [{
+      type: 'pie',
+      radius: ['38%', '65%'],
+      center: ['50%', '48%'],
+      avoidLabelOverlap: true,
+      itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+      label: { formatter: '{b}\n¥{c}' },
+      data: categoryData
+    }]
+  });
+
+  // 柱状图
+  const barChart = echarts.init(document.getElementById('barChart'));
+  barChart.setOption({
+    title: { text: '每日支出趋势', left: 'center', top: 8, textStyle: { fontSize: 16 } },
+    tooltip: { trigger: 'axis', formatter: params => `${params[0].axisValue}<br/>¥${params[0].value}` },
+    grid: { left: 50, right: 24, top: 60, bottom: 60 },
+    xAxis: {
+      type: 'category',
+      data: dailyData.map(d => d.date.slice(5)),
+      axisLabel: { rotate: 30, fontSize: 11 }
+    },
+    yAxis: {
+      type: 'value',
+      name: '金额（元）',
+      axisLabel: { formatter: '¥{value}' }
+    },
+    series: [{
+      type: 'bar',
+      data: dailyData.map(d => d.value),
+      barMaxWidth: 40,
+      itemStyle: {
+        borderRadius: [6, 6, 0, 0],
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: '#4f9cff' },
+          { offset: 1, color: '#1677ff' }
+        ])
+      },
+      label: {
+        show: true,
+        position: 'top',
+        formatter: p => p.value >= 100 ? `¥${p.value}` : ''
+      }
+    }]
+  });
+
+  // 明细表
+  const tbody = document.getElementById('detailTable');
+  tbody.innerHTML = detailData.map(item => `
+    <tr>
+      <td>${item.time}</td>
+      <td><span class="tag">${item.cat}</span></td>
+      <td>${item.desc}</td>
+      <td>¥${item.amount.toFixed(2)}</td>
+      <td>${item.orig === '不计收支' ? '不计收支 → 支出' : item.orig}</td>
+      <td>${item.status}</td>
+    </tr>
+  `).join('');
+
+  window.addEventListener('resize', () => {
+    pieChart.resize();
+    barChart.resize();
+  });
+</script>
+</body>
+</html>
